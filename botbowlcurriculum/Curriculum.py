@@ -149,7 +149,8 @@ class Academy:
         assert round(sum(self.lec_prob), 3) == 1.0
 
     def get_next_lecture(self):
-        return np.random.choice(self.lect_histo, 1, p=self.lec_prob)[0].lecture
+        rand_int = np.random.choice(list(range(len(self.lect_histo))), 1, p=self.lec_prob)[0]
+        return self.lect_histo[rand_int], rand_int
 
     def add_lecture(self, lectures):
         if type(lectures) != list:
@@ -202,7 +203,7 @@ def get_empty_game_turn(config="ff-11", turn=0, clear_board=True, hometeam="huma
 
     pitch_size = config.pitch_max
 
-    key = f"{hometeam} {awayteam} {pitch_size} {turn}"
+    key = f"{hometeam} {awayteam} {pitch_size} {turn} {clear_board}"
     if key in game_turn_memoized:
         game = deepcopy(game_turn_memoized[key])
 

@@ -1,6 +1,6 @@
 # import ffai.ai.pathfinding as pf
 
-from Curriculum import *
+from botbowlcurriculum.Curriculum import *
 
 
 # ### CONVERTED LECTURES ###

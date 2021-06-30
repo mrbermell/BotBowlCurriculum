@@ -4,12 +4,10 @@
 import numpy as np
 import ffai
 from pdb import set_trace
-from ffai.core.table import *
 
-from time import sleep
 import gym
 
-import Lectures as gc
+from botbowlcurriculum import Lectures as gc
 
 # Lecture to render.
 lecture = gc.Scoring()
