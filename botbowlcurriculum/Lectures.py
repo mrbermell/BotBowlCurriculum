@@ -789,6 +789,7 @@ class PlayRandomBot(PlayAgentLecture):
     def __init__(self):
         super().__init__("Random bot", RandomBot("Random"))
 
+lectures = [GameAgainstRandom()]
 
 if False:
     # class Caging(Lecture):
