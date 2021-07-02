@@ -6,43 +6,30 @@ from botbowlcurriculum.Curriculum import *
 # ### CONVERTED LECTURES ###
 class GameAgainstRandom(Lecture):
     def __init__(self):
-        super().__init__("vs. Random", 10)
-
-    def evaluate(self, game, drive_over):
-        if drive_over:
-            return LectureOutcome(self, win=(game.get_home_in_lead() == 1), draw=game.get_home_in_lead() == 0)
-        else:
-            return None
+        super().__init__("vs. Random", [10])
 
     def reset_game(self, config):
-        return get_empty_game_turn(config, turn=0)
+        return get_empty_game_turn(config, clear_board=False, turn=0)
 
 
 # ### Lectures ###
 class Scoring(Lecture):
     def __init__(self):
-        self.dst_mod = 9
-        self.obstacle_mod = 4
-        super().__init__("Score", self.dst_mod * self.obstacle_mod - 1)
+        dst_mod = 9
+        obstacle_mod = 4
+        super().__init__("Score", [dst_mod, obstacle_mod])
 
     def reset_game(self, config):
+
+        dst_to_td, obstacle_level = self.get_sublevels()
+        dst_to_td += 2
+
         game = get_empty_game_turn(config, turn=7)
-
-        # ### CONFIG ### #
-        board_x_max = len(game.state.pitch.board[0]) - 2
-        board_y_max = len(game.state.pitch.board) - 2
-
-        # Level configuration
-        level = self.get_level()
-        dst_to_td = (level % self.dst_mod) + 2
-        obstacle_level = (level // self.dst_mod) % self.obstacle_mod
-
-        home_players = get_home_players(game)
-        away_players = get_away_players(game)
+        x_max, y_max, home_players, away_players = get_game_data(game)
 
         # setup ball carrier
         p_carrier = home_players.pop()
-        move_player_within_square(game, p_carrier, dst_to_td, [1, board_y_max], give_ball=True)
+        move_player_within_square(game, p_carrier, dst_to_td, [1, y_max], give_ball=True)
 
         extra_ma = (p_carrier.position.x - 1) - p_carrier.get_ma() - 1
         p_carrier.extra_ma = max(min(extra_ma, 2), 0)
@@ -73,63 +60,33 @@ class Scoring(Lecture):
 
         return game
 
-    def evaluate(self, game, drive_over):
-        if drive_over:
-            return LectureOutcome(self, win=(game.get_home_in_lead() == 1), draw=game.get_home_in_lead() == 0)
-        else:
-            return None
-
 
 class PickupAndScore(Lecture):
     def __init__(self):
-        self.dst_mod = 7  # this number becomes steps from td
-        self.ball_mod = 4
-        self.marked_ball_mod = 2
+        dst_mod = 7  # this number becomes steps from td
+        ball_mod = 4
+        marked_ball_mod = 2
 
-        super().__init__("Pickup", self.dst_mod * self.ball_mod * self.marked_ball_mod - 1)
+        super().__init__("Pickup", [dst_mod, ball_mod, marked_ball_mod])
 
-    def _reset_lecture(self, game):
+    def reset_game(self, config):
+        dst_to_td, ball_start, marked_ball = self.get_sublevels()
+        dst_to_td += 2
 
-        # ### CONFIG ### #
-        board_x_max = len(game.state.pitch.board[0]) - 2
-        board_y_max = len(game.state.pitch.board) - 2
+        game = get_empty_game_turn(config, turn=7)
+        x_max, y_max, home_players, away_players = get_game_data(game)
 
-        # Level configuration
-        level = self.get_level()
-        dst_to_td = (level % self.dst_mod) + 2
-        ball_start = (level // self.dst_mod) % self.ball_mod
-        marked_ball = (level // self.dst_mod // self.ball_mod) % self.marked_ball_mod
-
-        home_players = get_home_players(game)
-        away_players = get_away_players(game)
-
-        p_carrier = home_players.pop()
-        move_player_within_square(game, p_carrier, x=dst_to_td, y=[2, board_y_max - 2])
+        p_carrier = pop_role(home_players, 'Thrower')  #home_players.pop()
+        move_player_within_square(game, p_carrier, x=dst_to_td, y=[2, y_max - 2])
 
         scatter_ball(game, max(ball_start, 1), p_carrier.position)
-        ball_pos = game.get_ball().position
-
-        # setup SURE HANDS?
-        if 0.5 < random.random():
-            p_carrier.extra_skills += [Skill.SURE_HANDS]
-
-        # moves needed
-        moves_required = p_carrier.position.distance(ball_pos) + (ball_pos.x - 1)
-        extra_ma = moves_required - p_carrier.get_ma()
-        p_carrier.extra_ma = max(min(extra_ma, 2), 0)
-
-        # Move the ball a little bit to enable score.
-        move_ball_dx = max(moves_required - p_carrier.get_ma() - 1, 0)  # one GFI ok
-        game.get_ball().position.x -= move_ball_dx
-        if game.get_ball().position == p_carrier.position:
-            game.get_ball().position.x -= 1  # Make sure it's not moved unto the carrier
 
         ball_pos = game.get_ball().position
         p_pos = p_carrier.position
         # Mark the ball
         if marked_ball > 0:
             marker = away_players.pop()
-            game.move(marker, get_boundary_square(game, 1, ball_pos))
+            game.put(marker, get_boundary_square(game, 1, ball_pos))
             marker.state.up = random.random() < 0.7
 
             if 0.5 < random.random():
@@ -141,7 +98,7 @@ class PickupAndScore(Lecture):
         y_top = min(p_pos.y, ball_pos.y) - 1
         y_bottom = max(p_pos.y, ball_pos.y) + 1
 
-        p_used = 1 - level / (self.max_level)
+        p_used = 1 - self.get_level() / self.max_level
 
         move_players_out_of_square(game, home_players, [x_left, x_right], [y_top, y_bottom], p_used=p_used)
         move_players_out_of_square(game, away_players, [x_left, x_right], [y_top, y_bottom])
@@ -151,17 +108,10 @@ class PickupAndScore(Lecture):
             a = Action(action_type=ActionType.START_MOVE, position=p_carrier.position, player=p_carrier)
             game.step(a)
 
-        self.turn = deepcopy(game.state.home_team.state.turn)
 
-    def training_done(self, game):
-        training_complete = self.turn != game.state.home_team.state.turn
-        training_outcome = game.state.home_team.state.score > 0
-        return training_complete, training_outcome
+        return game
 
-    def allowed_fail_rate(self):
-        return 2 / 6
-
-
+""" 
 class PassAndScore(Lecture):
     def __init__(self, handoff=True):
         self.pass_dist_mod = 6
@@ -430,7 +380,7 @@ class CrowdSurf(Lecture):
 
 
 class PreventScore(Lecture):
-    def __init__(self, home_defence, reverse_agent_play_first=False, debug=False):
+    def __init__(self, home_defence=False, reverse_agent_play_first=False, debug=False):
         # Reverse = True - used to evaluate that the agent can score if nothing is done from the setup.
         # reverse_play_first = True - Let away agent do a turn first then let home try to score. TODO!
         assert not reverse_agent_play_first  # not implemented
@@ -681,23 +631,6 @@ class ChooseBlockDie(Lecture):
             return 0
 
 
-class PlayAgentLecture(Lecture):
-    def __init__(self, name, agent):
-        super().__init__(name, 10)
-        self.agent = agent
-
-    def get_opp_actor(self):
-        return self.agent
-
-    def lec_reset_required(self):
-        return False
-
-    def training_done(self, game):
-        return game.state.game_over, (game.state.away_team.state.score <= game.state.home_team.state.score)
-
-    def is_full_game_lect(self): return True
-
-
 class PickupKickoffBall(Lecture):
     def __init__(self):
 
@@ -779,91 +712,4 @@ class PickupKickoffBall(Lecture):
     def allowed_fail_rate(self):
         return 0
 
-
-class PlayScriptedBot(PlayAgentLecture):
-    def __init__(self):
-        super().__init__("Scripted bot", ffai.make_bot('scripted'))
-
-
-class PlayRandomBot(PlayAgentLecture):
-    def __init__(self):
-        super().__init__("Random bot", RandomBot("Random"))
-
-lectures = [GameAgainstRandom()]
-
-if False:
-    # class Caging(Lecture):
-    # def __init__(self):
-    # self.distance_to_cage = 6
-    # self.cage_setup_level = 6
-    # super().__init__("Caging", self.distance_to_cage * self.cage_setup_level -1)
-
-    # def _reset_lecture(self, game):
-
-    #       ### CONFIG ### #
-    # board_x_max = len(game.state.pitch.board[0]) -2
-    # board_y_max = len(game.state.pitch.board) -2
-
-    #        Level configuration
-    # level = self.get_level()
-    # distance_to_cage = (level % self.distance_to_cage) +1
-    # cage_setup_level = (level // self.distance_to_cage) % self.cage_setup_level
-
-    #        get players
-    # home_players = get_home_players(game)
-
-    #        setup cage
-    # cage_x = randint(4, board_x_max -1 - distance_to_cage)
-    # cage_y = randint(2, board_y_max -1)
-
-    # ps = [home_players.pop() for _ in range(4) ]
-    # game.move(ps[0], Square( cage_x+1, cage_y+1) )
-    # game.move(ps[1], Square( cage_x+1, cage_y-1) )
-    # game.move(ps[2], Square( cage_x-1, cage_y+1) )
-    # game.move(ps[3], Square( cage_x-1, cage_y-1) )
-
-    # for i in range(4):
-    # if i >= cage_setup_level:
-    # ps[i].state.used = True
-
-    # if cage_setup_level >= 5:
-    # move_player_within_square(game, ps[2], [cage_x-4, cage_y+1], [cage_x-1, cage_y+4])
-    # ps[2].state.up = False
-
-    # if cage_setup_level >= 6:
-    # move_player_within_square(game, ps[3], [cage_x-4, cage_y-4], [cage_x-1, cage_y-1])
-    # ps[3].state.up = False
-
-    # p_carrier = home_players.pop()
-    # move_player_within_square(game, p_carrier, [cage_x, cage_y-distance_to_cage], [cage_x+distance_to_cage, cage_y+distance_to_cage])
-    # game.get_ball().move_to( p_carrier.position )
-    # game.get_ball().is_carried = True
-
-    # xs = [p.position.x for p in ps].append(p_carrier.position.x)
-    # ys = [p.position.y for p in ps].append(p_carrier.position.y)
-
-    # x_min = min(xs)
-    # x_max = max(xs)
-    # y_min = min(ys)
-    # y_max = max(ys)
-
-    # for p in home_players:
-    # move_player_out_of_square(game, p, [x_min, y_min], [x_max, y_max])
-
-    #        place away team on other side of pitch, of the wings
-    # for p in get_away_players(game):
-    # move_player_out_of_square(game, p, [x_min, y_min], [x_max, y_max])
-
-    # self.turn = deepcopy(game.state.home_team.state.turn)
-
-    # def training_done(self, game):
-    # training_complete = self.turn  !=  game.state.home_team.state.turn
-
-    # num_tackle_zones_at(self, player, position)
-
-    # training_outcome = game.state.home_team.state.score > 0
-    # return training_complete, training_outcome
-
-    # def allowed_fail_rate(self):
-    # return 0
-    pass
+"""

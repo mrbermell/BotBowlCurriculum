@@ -1,3 +1,5 @@
+from functools import reduce
+
 import ffai
 from ffai.core.model import Square, Action, Agent, D3, D6, D8, BBDie
 from ffai.core.table import ActionType, Skill
@@ -10,6 +12,8 @@ from collections import Iterable
 import numpy as np
 from ffai.core.game import *
 from ffai.core.load import *
+from ffai.core.model import Agent
+from operator import mul
 
 from ffai.ai.bots.random_bot import RandomBot
 
@@ -18,21 +22,44 @@ from scipy.special import softmax
 HISTORY_SIZE = 200
 
 
+class DoNothingBot(Agent):
+
+    def __init__(self, name, seed=None):
+        super().__init__(name)
+
+    def act(self, game):
+        return game._forced_action()
+
+    def new_game(self, game, team):
+        pass
+
+    def end_game(self, game):
+        pass
+
+
 class Lecture:
-    def __init__(self, name, max_level, delta_level=0.1):
+    def __init__(self, name, sub_levels):
         self.name = name
         self.level = 0
-        self.max_level = max_level
-        self.delta_level = delta_level
         self.exceptions_thrown = 0
 
-        assert delta_level > 0
+        assert len(sub_levels) in list(range(1,10))
+        self.sub_levels = sub_levels
+        self.max_level = reduce(mul, self.sub_levels, 1) - 1 # -1 because level=0 is the first level.
 
-    def increase_diff(self):
-        self.level = min(self.max_level, self.level + self.delta_level)
+    def get_sublevels(self):
 
-    def decrease_diff(self):
-        self.level = max(0, self.level - self.delta_level)
+
+        num_sublvls = len(self.sub_levels)
+        current_sub_level = [0]*num_sublvls
+        level = self.get_level()
+
+        for i in range(num_sublvls):
+            denominator = reduce(mul, self.sub_levels[:i], 1)
+            current_sub_level[i] = (level//denominator) % self.sub_levels[i]
+
+        return tuple(current_sub_level)
+
 
     def increase_level(self):
         self.level += 1 * (self.level < self.max_level)
@@ -53,13 +80,25 @@ class Lecture:
         """
         raise NotImplementedError("Must be overridden by subclass")
 
-    def evaluate(self, game, drive_over):
+    def evaluate(self, game):
         """
         :param game: game object to be judged
-        :param drive_over: is set to True last time this function is called.
-        :return: a LectureOutcome object
+        :return: array shape=(2,), dtype=np.int. Containing [level, outcome]
         """
-        raise NotImplementedError("Must be overridden by subclass")
+        level = self.get_level()
+        outcome = self._evaluate(game)
+        return np.array((level, outcome), dtype=np.int)
+
+    def _evaluate(self, game):
+        """
+        :param game: game object to be judged
+        :return: int describing outcome. -1 = failed, 0=draw, 1=success.
+        """
+
+        outcome = game.state.home_team.state.score - game.state.away_team.state.score
+        if abs(outcome) > 1:
+            outcome = outcome // abs(outcome)
+        return outcome
 
     def allowed_fail_rate(self):
         """
@@ -195,51 +234,50 @@ class Academy:
 game_turn_memoized = {}
 
 
-def get_empty_game_turn(config="ff-11", turn=0, clear_board=True, hometeam="human", awayteam="human", away_agent=None):
+def get_empty_game_turn(config="bot-bowl-iii", home_receiving=None, turn=0, clear_board=True, away_agent=None):
     if type(config) == str:
         config = load_config(config)
     config.competition_mode = False
     config.fast_mode = True
+    seed = np.random.randint(0, 2 ** 32)
 
     pitch_size = config.pitch_max
 
-    key = f"{hometeam} {awayteam} {pitch_size} {turn} {clear_board}"
+    key = f"{pitch_size} {turn} {clear_board} {home_receiving}"
     if key in game_turn_memoized:
         game = deepcopy(game_turn_memoized[key])
-
+        game.set_seed(seed)
         if away_agent is not None:
             game.replace_away_agent(away_agent)
         return game
 
     D3.FixedRolls = []
-    D6.FixedRolls = [3, 3, 3, 3, 3, 3, 3, 3, 3]  # No crazy kickoff or broken armors
+    D6.FixedRolls = [3, 4, 3, 4, 3, 4, 3, 4, 3]  # No crazy kickoff or broken armors
     D8.FixedRolls = []
     BBDie.FixedRolls = []
 
     ruleset = load_rule_set(config.ruleset)
 
     size_suffix = f"-{pitch_size}" if pitch_size != 11 else ""
+    hometeam = "human"
+    awayteam = "human"
     home = load_team_by_filename(hometeam + size_suffix, ruleset, board_size=pitch_size)
     away = load_team_by_filename(awayteam + size_suffix, ruleset, board_size=pitch_size)
-    game = Game(1, home, away, Agent("human1", human=True), Agent("human2", human=True), config)
+    game = Game(seed, home, away, home_agent=Agent("human1", human=True), away_agent=Agent("human2", human=True), config=config)
     game.init()
+    game.step(Action(ActionType.START_GAME))
 
-    random_agent = RandomBot("home")
+    if home_receiving is not None:
+        game.step(Action(ActionType.HEADS))
+        if (game.state.coin_toss_winner == home and home_receiving) or (game.state.coin_toss_winner == away and not home_receiving):
+            game.step(Action(ActionType.RECEIVE))
+        else:
+            game.step(Action(ActionType.KICK))
+
 
     if turn > 0:
-        game.step(Action(ActionType.START_GAME))
-        game.step(Action(ActionType.HEADS))
-        game.step(Action(ActionType.KICK))
-        game.step(Action(ActionType.SETUP_FORMATION_ZONE))
-        game.step(Action(ActionType.END_SETUP))
-        game.step(Action(ActionType.SETUP_FORMATION_WEDGE))
-        game.step(Action(ActionType.END_SETUP))
-        while type(game.get_procedure()) is not Turn or game.is_quick_snap() or game.is_blitz():
-            action = random_agent.act(game)
-            game.step(action)
-
-        while game.state.home_team.state.turn != turn:
-            game.step(Action(ActionType.END_TURN))
+        while type(game.get_procedure()) is not Turn or game.state.home_team.state.turn != turn or game.state.available_actions[0].team != home:
+            game.step(game._forced_action())
 
         if clear_board:
             game.clear_board()
@@ -247,8 +285,10 @@ def get_empty_game_turn(config="ff-11", turn=0, clear_board=True, hometeam="huma
     if away_agent is not None:
         game.replace_away_agent(away_agent)
     else:
-        game.replace_away_agent(random_agent)
+        game.replace_away_agent(DoNothingBot("Do nothing bot"))
+
     D6.FixedRolls = []
+    game.step()
     game_turn_memoized[key] = deepcopy(game)
 
     return game
@@ -265,6 +305,14 @@ def get_away_players(game):
 
 
 def get_boundary_square(game, steps, from_position):
+    """
+    :param game:
+    :param steps:
+    :param from_position:
+    :return: position that is 'steps' away from 'from_position'
+    checks are done so it's square is available
+    """
+
     steps = int(steps)
 
     if steps == 0:
@@ -273,8 +321,7 @@ def get_boundary_square(game, steps, from_position):
         else:
             steps += 1
 
-            # return a position that is 'steps' away from 'from_position'
-    # checks are done so it's square is available
+
     board_x_max = len(game.state.pitch.board[0]) - 2
     board_y_max = len(game.state.pitch.board) - 2
 
@@ -456,8 +503,19 @@ def swap_game(game):
     # assert game.get_ball().position.x ==  ball_new_x
     pass
 
+def get_game_data(game):
+    x_max = len(game.state.pitch.board[0]) - 2
+    y_max = len(game.state.pitch.board) - 2
+    home_players = get_home_players(game)
+    away_players = get_away_players(game)
 
+    return x_max, y_max, home_players, away_players
 
+def pop_role(players, role):
+    for i, player in enumerate(players):
+        if player.role.name == role:
+            return players.pop(i)
+    assert False, f"No role='{role}' in the list"
 
 if __name__ == "__main__":
     import statsmodels.stats.proportion as stats
