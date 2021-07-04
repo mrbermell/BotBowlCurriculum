@@ -38,7 +38,7 @@ class Lecture:
         :return: int describing outcome. -1 = failed, 0=draw, 1=success.
         """
         outcome = game.state.home_team.state.score - game.state.away_team.state.score
-        return outcome // abs(outcome)
+        return outcome // abs(outcome) if outcome != 0 else 0
 
     def evaluate(self, game):
         """
