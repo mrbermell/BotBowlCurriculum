@@ -1,7 +1,7 @@
 # import ffai.ai.pathfinding as pf
 
 from botbowlcurriculum.Curriculum import *
-
+from botbowlcurriculum.utils import *
 
 # ### CONVERTED LECTURES ###
 class GameAgainstRandom(Lecture):
