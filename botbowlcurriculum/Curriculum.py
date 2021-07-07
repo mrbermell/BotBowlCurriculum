@@ -140,6 +140,10 @@ class LectureHistory:
         s = f"ep={self.episodes}, steps={self.steps}, lvl= {lvl} ({self.max_acheived})/{max_lvl}), avg={avg}"
         return s
 
+    def get_progress_score(self):
+        score = 10.0 # Entropy term
+        return score
+
 
 class Academy:
     def __init__(self, lectures):
@@ -149,7 +153,8 @@ class Academy:
         self._update_probs()
 
     def _update_probs(self):
-        self.lec_prob = np.ones((len(self),)) / len(self)
+        scores = np.array([lect_hist.get_progress_score() for lect_hist in self.lect_histo])
+        self.lec_prob = scores / sum(scores)
         assert round(sum(self.lec_prob), 3) == 1.0
 
     def evaluate(self):
