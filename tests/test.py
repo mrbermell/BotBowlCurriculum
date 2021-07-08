@@ -1,3 +1,4 @@
+import botbowlcurriculum
 import gym
 import ffai
 from botbowlcurriculum.Curriculum import Lecture, Academy
@@ -52,4 +53,11 @@ def test_academy():
 
     academy.evaluate()
 
+
+def test_probs_and_levels():
+    academy = botbowlcurriculum.make_academy()
+    prob_lvls = academy.get_probs_and_levels()
+    assert prob_lvls.shape == (len(academy), 2)
+    assert (prob_lvls[:, 0] == 0).all()
+    assert np.sum(np.round(prob_lvls[:,1], 7)) == 1.0
 

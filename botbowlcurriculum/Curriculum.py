@@ -35,10 +35,10 @@ class Lecture:
     def _evaluate(self, game):
         """ To be overwritten!
         :param game: game object to be judged
-        :return: int describing outcome. -1 = failed, 0=draw, 1=success.
+        :return: int describing outcome. -1 = failed, 1=success.
         """
         outcome = game.state.home_team.state.score - game.state.away_team.state.score
-        return outcome // abs(outcome) if outcome != 0 else 0
+        return 1 if outcome > 0 else -1
 
     def evaluate(self, game):
         """
@@ -93,7 +93,7 @@ class LectureHistory:
     def log(self, level, outcome):
         i = self.index
 
-        if level == self.lecture.get_level() and i < self.MAX_SIZE:
+        if outcome != 0 and level == self.lecture.get_level() and i < self.MAX_SIZE:
             self.outcomes[i] = 1 if outcome == 1 else 0
             self.episodes += 1
             self.index += 1
@@ -155,7 +155,6 @@ class Academy:
     def _update_probs(self):
         scores = np.array([lect_hist.get_progress_score() for lect_hist in self.lect_histo])
         self.lec_prob = scores / sum(scores)
-        assert round(sum(self.lec_prob), 3) == 1.0
 
     def evaluate(self):
         for lect in self.lect_histo:
@@ -193,6 +192,12 @@ class Academy:
             s += l.report() + "\n"
 
         return s
+
+    def get_probs_and_levels(self):
+        levels = [lect_history.lecture.get_level() for lect_history in self.lect_histo]
+        levels = np.array(levels, dtype=np.float32)
+
+        return np.stack( (levels, self.lec_prob), axis=1)
 
 
 if __name__ == "__main__":
