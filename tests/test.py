@@ -59,5 +59,5 @@ def test_probs_and_levels():
     prob_lvls = academy.get_probs_and_levels()
     assert prob_lvls.shape == (len(academy), 2)
     assert (prob_lvls[:, 0] == 0).all()
-    assert np.sum(np.round(prob_lvls[:,1], 7)) == 1.0
+    assert np.round(np.sum(prob_lvls[:,1]), 7) == 1.0
 

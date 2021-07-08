@@ -2,6 +2,7 @@
 
 from botbowlcurriculum.Curriculum import *
 from botbowlcurriculum.utils import *
+from ffai.core.table import Skill
 
 # ### CONVERTED LECTURES ###
 class GameAgainstRandom(Lecture):

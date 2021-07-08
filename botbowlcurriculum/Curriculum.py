@@ -1,9 +1,7 @@
 import numpy as np
 from functools import reduce
-
-from ffai.core.load import *
-from operator import mul
 import statsmodels.stats.proportion as stats
+from operator import mul
 
 class Lecture:
     def __init__(self, name, sub_levels):
@@ -154,7 +152,8 @@ class Academy:
 
     def _update_probs(self):
         scores = np.array([lect_hist.get_progress_score() for lect_hist in self.lect_histo])
-        self.lec_prob = scores / sum(scores)
+        scores /= np.sum(scores)
+        self.lec_prob = scores
 
     def evaluate(self):
         for lect in self.lect_histo:
