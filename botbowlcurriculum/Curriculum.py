@@ -143,7 +143,8 @@ class LectureHistory:
         report = {"name": self.lecture.name,
                   "level": self.lecture.get_level(),
                   "max_level": self.max_acheived,
-                  "average_success": avg}
+                  "average_success": avg,
+                  "num_episodes": self.episodes}
         return report
 
 
