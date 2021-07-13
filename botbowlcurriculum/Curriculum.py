@@ -127,7 +127,6 @@ class LectureHistory:
 
         # continue
 
-
     def report(self, with_name=False):
         lvl = str(self.lecture.get_level())
         max_lvl = self.lecture.max_level
@@ -137,6 +136,16 @@ class LectureHistory:
 
         s = f"ep={self.episodes}, steps={self.steps}, lvl= {lvl} ({self.max_acheived})/{max_lvl}), avg={avg}"
         return s
+
+    def get_report_dict(self):
+        avg = self.outcomes[:self.index].mean() if self.index > 0 else 0
+
+        report = {"name": self.lecture.name,
+                  "level": self.lecture.get_level(),
+                  "max_level": self.max_acheived,
+                  "average success": avg}
+        return report
+
 
     def get_progress_score(self):
         score = 10.0 # Entropy term
@@ -178,8 +187,6 @@ class Academy:
         return len(self.lect_histo)
 
     def report(self, filename=None):
-        # render plots
-
         max_name_len = max([len(l.lecture.name) for l in self.lect_histo])
 
         s = ""
@@ -198,6 +205,12 @@ class Academy:
 
         return np.stack( (levels, self.lec_prob), axis=1)
 
+    def get_report_dicts(self):
+        reports = [lect_history.get_report_dict() for lect_history in self.lect_histo]
+        for report, prob in zip(reports, self.lec_prob):
+            report['probability'] = prob
+
+        return reports
 
 if __name__ == "__main__":
     import statsmodels.stats.proportion as stats

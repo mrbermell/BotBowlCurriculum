@@ -52,6 +52,7 @@ def test_academy():
     academy.log_training(outcome)
 
     academy.evaluate()
+    reports = academy.get_report_dicts()
 
 
 def test_probs_and_levels():
