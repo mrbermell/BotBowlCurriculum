@@ -26,7 +26,7 @@ class Lecture:
         """
         Not sure how to use this. TODO TBD
         """
-        return 8/9 # 3+ with re-roll may fail.
+        return 6/9 # 3+ with re-roll may fail.
 
     # Overwrite to change behavior. Default is winner of game
     def _evaluate(self, game):
