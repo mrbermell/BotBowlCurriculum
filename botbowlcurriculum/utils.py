@@ -12,7 +12,23 @@ class DoNothingBot(Agent):
         super().__init__(name)
 
     def act(self, game):
-        return game._forced_action()
+        for action_type in [ActionType.END_TURN, ActionType.END_SETUP, ActionType.END_PLAYER_TURN,
+                            ActionType.SELECT_NONE, ActionType.HEADS, ActionType.KICK, ActionType.SELECT_DEFENDER_DOWN,
+                            ActionType.SELECT_DEFENDER_STUMBLES, ActionType.SELECT_ATTACKER_DOWN,
+                            ActionType.SELECT_PUSH, ActionType.SELECT_BOTH_DOWN, ActionType.DONT_USE_REROLL,
+                            ActionType.DONT_USE_APOTHECARY, ActionType.SETUP_FORMATION_LINE,
+                            ActionType.SETUP_FORMATION_ZONE, ActionType.SETUP_FORMATION_SPREAD,
+                            ActionType.SETUP_FORMATION_WEDGE]:
+            for action in game.state.available_actions:
+                if action_type == ActionType.END_SETUP and not game.is_setup_legal(game.get_agent_team(game.actor)):
+                    continue
+                if action.action_type == action_type:
+                    return Action(action_type)
+        # Take random action
+        action_choice = game.rnd.choice(game.state.available_actions)
+        position = game.rnd.choice(action_choice.positions) if len(action_choice.positions) > 0 else None
+        player = game.rnd.choice(action_choice.players) if len(action_choice.players) > 0 else None
+        return Action(action_choice.action_type, position=position, player=player)
 
     def new_game(self, game, team):
         pass
