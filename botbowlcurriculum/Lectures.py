@@ -3,37 +3,75 @@
 from botbowlcurriculum.Curriculum import *
 from botbowlcurriculum.utils import *
 from ffai.core.table import Skill
+from ffai.ai.registry import make_bot
+
+global_player_mod = 2
 
 # ### CONVERTED LECTURES ###
 class GameAgainstRandom(Lecture):
     def __init__(self):
-        super().__init__("vs. Random", [10])
+        players_mod = global_player_mod
+        opp_mod = 2
+        start_with_ball_mod = 3
+
+        super().__init__("Random_init_game", [start_with_ball_mod, players_mod, opp_mod])
 
     def reset_game(self, config):
-        return get_empty_game_turn(config, clear_board=False, turn=0)
+        with_ball, players, opp =  self.get_sublevels()
+        players += 3
+
+        if opp == 0:
+            opp_agent = DoNothingBot('do nothing')
+        elif opp == 1:
+            opp_agent = None # Random bot
+        else:
+            opp_agent = make_bot("Scripted bot")  #todo
+
+        game = get_empty_game_turn(config, clear_board=True, turn=randint(1,5), away_agent=opp_agent)
+        x_max, y_max, home_players, away_players = get_game_data(game)
+
+        home_players = home_players[:players]
+        away_players = away_players[:players]
+
+        los_x = x_max // 2
+
+        if with_ball == 0:
+            move_player_within_square(game, home_players.pop(), [los_x, x_max], [1, y_max], give_ball=True)
+        elif with_ball == 2:
+            move_player_within_square(game, away_players.pop(), [1, los_x], [1, y_max], give_ball=True)
+
+        move_players_out_of_square(game, home_players, [1, los_x], [1, y_max])
+        move_players_out_of_square(game, away_players, [los_x, x_max], [1, y_max])
+
+        if with_ball == 1:
+            scatter_ball(game, randint(1, y_max//2), Square(los_x, y_max//2))
+
+        return game
 
 
-# ### Lectures ###
 class Scoring(Lecture):
     def __init__(self):
         dst_mod = 9
+        players_mod = global_player_mod
         obstacle_mod = 4
-        super().__init__("Score", [dst_mod, obstacle_mod])
+        super().__init__("Score", [players_mod, dst_mod, obstacle_mod])
 
     def reset_game(self, config):
 
-        dst_to_td, obstacle_level = self.get_sublevels()
+        players, dst_to_td, obstacle_level = self.get_sublevels()
         dst_to_td += 2
+        players += 2
 
-        game = get_empty_game_turn(config, turn=7)
+        game = get_empty_game_turn(config, turn=random.randint(5,7))
         x_max, y_max, home_players, away_players = get_game_data(game)
 
         # setup ball carrier
-        p_carrier = home_players.pop()
+        roles = ['Lineman', 'Thrower', 'Catcher']
+        p_carrier = pop_role(home_players, roles[randint(0,2)])
         move_player_within_square(game, p_carrier, dst_to_td, [1, y_max], give_ball=True)
 
-        extra_ma = (p_carrier.position.x - 1) - p_carrier.get_ma() - 1
-        p_carrier.extra_ma = max(min(extra_ma, 2), 0)
+        home_players = home_players[:players]
+        away_players = away_players[:players]
 
         if obstacle_level > 0:
             # Place it so a dodge is needed when dst_to_td is low.
@@ -67,18 +105,20 @@ class PickupAndScore(Lecture):
         dst_mod = 7  # this number becomes steps from td
         ball_mod = 4
         marked_ball_mod = 2
+        players_mod = global_player_mod
 
-        super().__init__("Pickup", [dst_mod, ball_mod, marked_ball_mod])
+        super().__init__("Pickup", [players_mod, dst_mod, ball_mod, marked_ball_mod])
 
     def reset_game(self, config):
-        dst_to_td, ball_start, marked_ball = self.get_sublevels()
+        players, dst_to_td, ball_start, marked_ball = self.get_sublevels()
         dst_to_td += 2
+        players += 2
 
-        game = get_empty_game_turn(config, turn=7)
+        game = get_empty_game_turn(config, turn=randint(5,7))
         x_max, y_max, home_players, away_players = get_game_data(game)
 
         p_carrier = pop_role(home_players, 'Thrower')  #home_players.pop()
-        move_player_within_square(game, p_carrier, x=dst_to_td, y=[2, y_max - 2])
+        move_player_within_square(game, p_carrier, x=dst_to_td, y=[1, y_max])
 
         scatter_ball(game, max(ball_start, 1), p_carrier.position)
 
@@ -99,16 +139,50 @@ class PickupAndScore(Lecture):
         y_top = min(p_pos.y, ball_pos.y) - 1
         y_bottom = max(p_pos.y, ball_pos.y) + 1
 
-        p_used = 1 - self.get_level() / self.max_level
+        home_players = home_players[:players]
+        away_players = away_players[:players]
 
-        move_players_out_of_square(game, home_players, [x_left, x_right], [y_top, y_bottom], p_used=p_used)
+        move_players_out_of_square(game, home_players, [x_left, x_right], [y_top, y_bottom])
         move_players_out_of_square(game, away_players, [x_left, x_right], [y_top, y_bottom])
 
-        if ball_start == 0:
-            game.set_available_actions()
-            a = Action(action_type=ActionType.START_MOVE, position=p_carrier.position, player=p_carrier)
-            game.step(a)
+        return game
 
+
+class SackAndScore(Lecture):
+    def __init__(self):
+        dst_mod = 4
+        players_mod = 5
+        opp_carrier_mod = 3
+        own_blocker_mod = 2
+        super().__init__("SackScore", [opp_carrier_mod, own_blocker_mod, players_mod, dst_mod, ])
+
+    def reset_game(self, config):
+
+        opp_carrier_diff, own_block_diff, players, dst_to_td = self.get_sublevels()
+        dst_to_td += 4
+        players += 4
+
+        game = get_empty_game_turn(config, turn=random.randint(5,7))
+        x_max, y_max, home_players, away_players = get_game_data(game)
+
+        # setup ball carrier
+        opp_roles = ['Lineman', 'Blitzer', 'Catcher']
+        p_carrier = pop_role(away_players, opp_roles[opp_carrier_diff])
+        move_player_within_square(game, p_carrier, dst_to_td, [3, y_max-2], give_ball=True)
+        xx = p_carrier.position.x
+        yy = p_carrier.position.y
+
+        #setup blocker and assist
+        if own_block_diff == 0:
+            blocker = pop_role(home_players, "Blitzer")
+        else:
+            blocker = home_players.pop()
+        move_player_within_square(game, blocker, [xx-1, xx+1], [yy-1, yy+1])
+        move_player_within_square(game, home_players.pop(), [xx - 1, xx + 1], [yy - 1, yy + 1])
+
+        home_players = home_players[:players-2]
+        away_players = away_players[:players-1]
+        move_players_out_of_square(game, home_players + away_players, [1, xx+3], [1, y_max])
 
         return game
 

@@ -1,7 +1,6 @@
 import numpy as np
 from functools import reduce
 import statsmodels.stats.proportion as stats
-from operator import mul
 
 class Lecture:
     def __init__(self, name, sub_levels):
@@ -11,7 +10,7 @@ class Lecture:
 
         assert len(sub_levels) in list(range(1,10))
         self.sub_levels = sub_levels
-        self.max_level = reduce(mul, self.sub_levels, 1) - 1 # -1 because level=0 is the first level.
+        self.max_level = reduce(lambda a, b: a*b, self.sub_levels, 1) - 1 # -1 because level=0 is the first level.
 
     # MUST override in subclass
     def reset_game(self, config):
@@ -53,7 +52,7 @@ class Lecture:
         level = self.get_level()
 
         for i in range(num_sublvls):
-            denominator = reduce(mul, self.sub_levels[:i], 1)
+            denominator = reduce(lambda a,b: a*b, self.sub_levels[:i], 1)
             current_sub_level[i] = (level//denominator) % self.sub_levels[i]
 
         return tuple(current_sub_level)
@@ -125,6 +124,7 @@ class LectureHistory:
         elif conf_high < target_p and self.retries <= 0:
             self.lecture.decrease_level()
             self.reset_self()
+            self.retries = 10
 
         # reset
         elif trials > 0.75 * self.MAX_SIZE:
