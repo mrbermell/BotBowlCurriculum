@@ -51,8 +51,7 @@ def test_academy():
 
     academy.log_training(outcome)
 
-    academy.evaluate()
-    reports = academy.get_report_dicts()
+    reports = academy.evaluate()
 
 
 def test_probs_and_levels():
@@ -61,4 +60,33 @@ def test_probs_and_levels():
     assert prob_lvls.shape == (len(academy), 2)
     assert (prob_lvls[:, 0] == 0).all()
     assert np.round(np.sum(prob_lvls[:,1]), 7) == 1.0
+
+def test_full_academy():
+    academy = botbowlcurriculum.make_academy()
+    num_outcomes = len(academy)
+    levels_seen = set()
+
+    for i in range(100):
+        prob_lvls = academy.get_probs_and_levels()
+
+        for j in range(len(academy)):
+            assert prob_lvls[j, 0] == academy.lect_histo[j].lecture.get_level()
+
+            levels_seen.add(int(prob_lvls[j, 0]))
+
+        outcome = np.zeros((num_outcomes, 3), dtype=np.int)
+        outcome[:,0] = np.array(list(range(num_outcomes)))
+        outcome[:,1] = prob_lvls[:,0]
+        outcome[:,2] = 1
+
+        academy.log_training(outcome)
+        if i > 1 and i % 10 == 0:
+            academy.evaluate()
+
+    #assert {0, 1, 2, 3, 4} in levels_seen
+    assert 0 in levels_seen
+    assert 1 in levels_seen
+    assert 2 in levels_seen
+    assert 3 in levels_seen
+    assert 4 in levels_seen
 

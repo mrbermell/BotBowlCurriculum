@@ -98,6 +98,8 @@ class LectureHistory:
 
             if outcome == 1 and self.max_acheived < level:
                 self.max_acheived = level
+        else:
+            print ("wrong level lecture")
 
     def evaluate(self):
         if self.index <= 5:
@@ -166,9 +168,15 @@ class Academy:
         self.lec_prob = scores
 
     def evaluate(self):
+        reports = [lect_history.get_report_dict() for lect_history in self.lect_histo]
+        for report, prob in zip(reports, self.lec_prob):
+            report['probability'] = prob
+
         for lect in self.lect_histo:
             lect.evaluate()
+
         self._update_probs()
+        return reports
 
     def get_next_lecture(self):
         rand_int = np.random.choice(list(range(len(self.lect_histo))), 1, p=self.lec_prob)[0]
@@ -206,12 +214,6 @@ class Academy:
 
         return np.stack( (levels, self.lec_prob), axis=1)
 
-    def get_report_dicts(self):
-        reports = [lect_history.get_report_dict() for lect_history in self.lect_histo]
-        for report, prob in zip(reports, self.lec_prob):
-            report['probability'] = prob
-
-        return reports
 
 if __name__ == "__main__":
     import statsmodels.stats.proportion as stats
