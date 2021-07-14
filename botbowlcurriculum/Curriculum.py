@@ -98,7 +98,8 @@ class LectureHistory:
 
             if outcome == 1 and self.max_acheived < level:
                 self.max_acheived = level
-        else:
+
+        elif level != self.lecture.get_level():
             print ("wrong level lecture")
 
     def evaluate(self):
