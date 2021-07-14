@@ -81,6 +81,7 @@ class LectureHistory:
         self.episodes = 0
         self.steps = 0
         self.max_acheived = -1
+        self.retries = 0
 
         self.reset_self()
 
@@ -99,7 +100,7 @@ class LectureHistory:
             if outcome == 1 and self.max_acheived < level:
                 self.max_acheived = level
 
-        elif level != self.lecture.get_level():
+        elif level < self.lecture.get_level():
             print ("wrong level lecture")
 
     def evaluate(self):
@@ -118,15 +119,17 @@ class LectureHistory:
         if outcome_p >= target_p:
             self.lecture.increase_level()
             self.reset_self()
+            self.retries = 10
 
         # decrease level
-        elif conf_high < target_p:
+        elif conf_high < target_p and self.retries <= 0:
             self.lecture.decrease_level()
             self.reset_self()
 
         # reset
         elif trials > 0.75 * self.MAX_SIZE:
             self.reset_self()
+            self.retries -= 1
 
         # continue
 
