@@ -155,8 +155,14 @@ class LectureHistory:
 
 
     def get_progress_score(self):
-        score = 10.0 # Entropy term
-        return score
+        entropy = 10.0 # Entropy term
+        forget = 5 * max(0, self.max_acheived - self.lecture.get_level())
+        finished = -9 * (self.lecture.max_level == self.lecture.get_level() )
+        stuck = 1
+
+        score = entropy + forget + finished
+
+        return max(1, score) # No negative values!
 
 
 class Academy:
