@@ -5,6 +5,7 @@ setup(name='botbowlcurriculum',
       include_package_data=True,
       install_requires=[
           'numpy',
+          'statsmodels'
       ],
       packages=find_packages()
 )
